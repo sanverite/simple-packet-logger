@@ -1,0 +1,39 @@
+# OS/macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor/IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Go build artifacts
+bin/
+build/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Coverage / test reports
+*.cover
+*.coverprofile
+coverage.txt
+cover.*
+
+# Logs and env files
+*.log
+.env
+.env.*
+
+# Vendor (uncomment if you decide to vendor deps)
+# vendor/
+
+# Tools/binaries generated locally (e.g., tun2socks)
+tun2socks*
