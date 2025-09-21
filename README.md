@@ -34,6 +34,7 @@ See `docs/api.md` for schemas and examples.
 - `cmd/agent`: main binary, flags, process lifecycle
 - `internal/core`: state model, lifecycle, snapshots
 - `internal/api`: HTTP server, JSON types, mapping from core
+- `internal/probe`: network probes (SOCKS5), used by future /v1/probe and orchestration
 - `docs/`: deep dives (architecture, API, state, operations)
 
 ## Requirements

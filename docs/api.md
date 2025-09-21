@@ -73,13 +73,37 @@ Schema:
 
 ## Future Endpoints
 
-- `POST /v1/probe`:
-  - Input: `{ "socks_server":"host:port", "timeout_ms":3000, "auth":{"username":"", "password":""} }`
-  - Output: probe view + warnings; updates internal state.
+- `POST /v1/probe` (planned):
+  - Input:
+    ```json
+    {
+      "socks_server": "host:port",
+      "timeout_ms": 3000,
+      "auth": {"username": "", "password": ""},
+      "connect_target": "example.com:80",
+      "udp_test": false
+    }
+    ```
+  - Output: 200 OK with the same schema as "last_probe" in GET /v1/status; also updates internal state.
+    ```json
+    {
+      "reachable": true,
+      "socks_ok": true,
+      "connect_ok": true,
+      "udp_ok": false,
+      "latencies_ms": {"tcp_connect": 12, "socks_handshake": 5, "connect": 20, "udp_associate": 9},
+      "features": {"auth": "none", "ipv6": false, "udp": false},
+      "last_checked": "2025-01-01T00:00:00Z",
+      "warnings": []
+    }
+    ```
+  - Errors:
+    - 400 Bad Request for invalid inputs (e.g., malformed host:port).
+    - 502 Bad Gateway for probe failures (e.g., TCP connect or CONNECT failed), with an APIError body.
+    - 405 Method Not Allowed for non-POST methods.
 - `POST /v1/start`:
   - Input: `{ "socks_server":"host:port", "mtu":1500, "bypass":["host"], "dry_run":false }`
   - Output: orchestration summary; state transitions.
 - `POST /v1/stop`:
   - Input: `{ "force":false }`
   - Output: teardown summary; state transitions.
-
