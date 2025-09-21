@@ -66,6 +66,29 @@ func FromCoreSnapshot(s core.Snapshot) StatusResponse {
 	}
 }
 
+// FromProbeSummary converts core.ProbeSummary to the public ProbeView.
+// Keeps slice/map fields immutable by cloning.
+func FromProbeSummary(p core.ProbeSummary) ProbeView {
+	var lastChecked string
+	if !p.LastChecked.IsZero() {
+		lastChecked = p.LastChecked.UTC().Format(time.RFC3339)
+	}
+	return ProbeView{
+		Reachable:   p.Reachable,
+		SocksOK:     p.SocksOK,
+		ConnectOK:   p.ConnectOK,
+		UDPOK:       p.UDPOK,
+		LatenciesMs: cloneLatencies(p.LatenciesMs),
+		Features: ProxyFeatures{
+			Auth: p.Features.Auth,
+			IPv6: p.Features.IPv6,
+			UDP:  p.Features.UDP,
+		},
+		LastChecked: lastChecked,
+		Warnings:    append([]string(nil), p.Warnings...),
+	}
+}
+
 func cloneLatencies(in map[string]int64) map[string]int64 {
 	if len(in) == 0 {
 		return nil

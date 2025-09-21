@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/sanverite/simple-packet-logger/internal/core"
+	"github.com/sanverite/simple-packet-logger/internal/probe"
 )
 
 // Constants for route prefixing. Versioning is explicit to allow non-breaking additions.
@@ -88,6 +89,7 @@ func NewServer(state *core.State, opts ServerOptions) *Server {
 	// Routes
 	mux.HandleFunc("/"+APIVersion+"/healthz", s.handleHealthz)
 	mux.HandleFunc("/"+APIVersion+"/status", s.handleStatus)
+	mux.HandleFunc("/"+APIVersion+"/probe", s.handleProbe)
 
 	return s
 }
@@ -140,6 +142,85 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	snap := s.state.GetSnapshot()
 	resp := FromCoreSnapshot(snap)
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleProbe runs a bounded SOCKS5 probe and returns a ProbeView.
+// Method: POST
+// Request: ProbeRequest JSON
+// Response (200): ProbeView JSON (same shape as "last_probe" in /v1/status)
+// Errors:
+//   - 400 for invalid inputs (malformed host:port, negative timeout)
+//   - 502 for probe failures (TCP connect/handshake/CONNECT/UDP errors), state still updates
+func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, APIError{
+			Error:     "method not allowed",
+			Timestamp: TimeNow().UTC().Format(time.RFC3339),
+		})
+		return
+	}
+
+	// Strict JSON decode with unkown-field rejection.
+	var req ProbeRequest
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, APIError{
+			Error:     "invalid JSON: " + err.Error(),
+			Timestamp: TimeNow().UTC().Format(time.RFC3339),
+		})
+		return
+	}
+
+	// Basic input validation (deeper checks happen inside the probe package).
+	if req.SocksServer == "" {
+		writeJSON(w, http.StatusBadRequest, APIError{
+			Error:     "socks_server is required",
+			Timestamp: TimeNow().UTC().Format(time.RFC3339),
+		})
+		return
+	}
+	if req.TimeoutMS < 0 {
+		writeJSON(w, http.StatusBadRequest, APIError{
+			Error:     "timeout_ms must be >= 0",
+			Timestamp: TimeNow().UTC().Format(time.RFC3339),
+		})
+		return
+	}
+
+	// Request -> probe.Config mapping with sensible defaults.
+	var auth *probe.Auth
+	if req.Auth != nil && (req.Auth.Username != "" || req.Auth.Password != "") {
+		auth = &probe.Auth{
+			Username: req.Auth.Username,
+			Password: req.Auth.Password,
+		}
+	}
+	cfg := probe.Config{
+		Server:        req.SocksServer,
+		Timeout:       time.Duration(req.TimeoutMS) * time.Millisecond,
+		Auth:          auth,
+		ConnectTarget: req.ConnectTarget,
+		UDPTest:       req.UDPTest,
+	}
+
+	// Run the probe using the request context; probe also enforces its own deadline.
+	summary, err := probe.ProbeSOCKS(r.Context(), cfg)
+
+	// Persist the result regardless of success.
+	s.state.UpdateProbe(summary)
+
+	if err != nil {
+		// Return a stable error; details available via /v1/status last_probe.warnings.
+		writeJSON(w, http.StatusBadGateway, APIError{
+			Error:     "probe failed: " + err.Error(),
+			Timestamp: TimeNow().UTC().Format(time.RFC3339),
+		})
+		return
+	}
+
+	// Success: return the probe payload.
+	resp := FromProbeSummary(summary)
 	writeJSON(w, http.StatusOK, resp)
 }
 

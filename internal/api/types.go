@@ -72,3 +72,26 @@ type APIError struct {
 
 // TimeNow abstracts time for tests; overridden in tests.
 var TimeNow = func() time.Time { return time.Now() }
+
+// ProbeRequest is the input body for POST /v1/probe.
+// It configures a bounded SOCKS5 probe with optional auth and UDP test.
+//
+// SocksServer is the upstream SOCKS5 proxy endpoint ("host:port").
+// TimeoutMS bounds the entire probe (0 = server default).
+// Auth holds optional credentials for proxies that require user/pass.
+// ConnectTarget is the target used for the CONNECT test ("host:port").
+// Empty uses a sensible default.
+// UDPTest requests a minimal UDP ASSOCIATE exchange.
+type ProbeRequest struct {
+	SocksServer   string     `json:"socks_server"`
+	TimeoutMS     int        `json:"timeout_ms"`
+	Auth          *ProbeAuth `json:"auth,omitempty"`
+	ConnectTarget string     `json:"connect_target"`
+	UDPTest       bool       `json:"udp_test"`
+}
+
+// ProbeAuth captures optional SOCKS5 username/password credentials.
+type ProbeAuth struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
