@@ -90,6 +90,8 @@ func NewServer(state *core.State, opts ServerOptions) *Server {
 	mux.HandleFunc("/"+APIVersion+"/healthz", s.handleHealthz)
 	mux.HandleFunc("/"+APIVersion+"/status", s.handleStatus)
 	mux.HandleFunc("/"+APIVersion+"/probe", s.handleProbe)
+	mux.HandleFunc("/"+APIVersion+"/start", s.handleStart)
+	mux.HandleFunc("/"+APIVersion+"/stop", s.handleStop)
 
 	return s
 }
@@ -222,6 +224,86 @@ func (s *Server) handleProbe(w http.ResponseWriter, r *http.Request) {
 	// Success: return the probe payload.
 	resp := FromProbeSummary(summary)
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleStart begins orchestration to route traffic via TUN + tun2socks.
+// Method: POST
+// Request: StartRequest JSON
+// Response (200): StartResponse JSON
+func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, APIError{
+			Error:     "method not allowed",
+			Timestamp: TimeNow().UTC().Format(time.RFC3339),
+		})
+		return
+	}
+
+	var req StartRequest
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, APIError{
+			Error:     "invalid JSON: " + err.Error(),
+			Timestamp: TimeNow().UTC().Format(time.RFC3339),
+		})
+		return
+	}
+
+	// Basic validation; depper checks will live in orchestrator.
+	if req.SocksServer == "" {
+		writeJSON(w, http.StatusBadRequest, APIError{
+			Error:     "socks_server is required",
+			Timestamp: TimeNow().UTC().Format(time.RFC3339),
+		})
+		return
+	}
+
+	// Conservative MTU bounds (typical ethernet MTU to jumbo); 0 means "use default".
+	if req.MTU < 0 || (req.MTU > 0 && (req.MTU < 576 || req.MTU > 9000)) {
+		writeJSON(w, http.StatusBadRequest, APIError{
+			Error:     "mtu must be 0 or between 576 and 9000",
+			Timestamp: TimeNow().UTC().Format(time.RFC3339),
+		})
+		return
+	}
+
+	// orchestration todo
+	writeJSON(w, http.StatusNotImplemented, APIError{
+		Error:     "start not implemented yet",
+		Timestamp: TimeNow().UTC().Format(time.RFC3339),
+	})
+}
+
+// handleStop tears down orchestration and restores routes.
+// Method: POST
+// Request: StopRequest JSON
+// Response (200): StopResponse JSON
+func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, APIError{
+			Error:     "method not allowed",
+			Timestamp: TimeNow().UTC().Format(time.RFC3339),
+		})
+		return
+	}
+
+	var req StopRequest
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		writeJSON(w, http.StatusNotImplemented, APIError{
+			Error:     "invalid JSON: " + err.Error(),
+			Timestamp: TimeNow().UTC().Format(time.RFC3339),
+		})
+		return
+	}
+
+	//
+	writeJSON(w, http.StatusNotImplemented, APIError{
+		Error:     "stop not implemented yet",
+		Timestamp: TimeNow().UTC().Format(time.RFC3339),
+	})
 }
 
 // Basic middleware: sets JSON content type and very lightweight logging.

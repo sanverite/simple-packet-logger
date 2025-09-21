@@ -95,3 +95,45 @@ type ProbeAuth struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
+
+// StartRequest configures orchestration to route host traffic via TUN + tun2socks.
+//
+// SocksServer is the upstream SOCKS5 proxy endpoint ("host:port")
+// Auth holds optional credentials for proxies that require user/pass.
+// MTU to set for the TUN interface. If 0, default will be user (e.g., 1500)
+// ConnectTarget used for initial end-to-end verification via CONNECT ("host:port")
+// Empty uses a sensible default.
+// BypassHosts will be routed outside the TUN (e.g., proxy host, LAN router).
+// DryRun performs discovery/probes and reports the plan without making changes.
+type StartRequest struct {
+	SocksServer   string     `json:"socks_server"`
+	Auth          *ProbeAuth `json:"auth,omitempty"`
+	MTU           int        `json:"mtu,omitempty"`
+	ConnectTarget string     `json:"connect_target"`
+	UDP           bool       `json:"udp"`
+	BypassHosts   []string   `json:"bypass_hosts"`
+	DryRun        bool       `json:"dry_run"`
+}
+
+// StartResponse summarizes the orchestration result and current state snapshot.
+type StartResponse struct {
+	State       string        `json:"state"`
+	Warnings    []string      `json:"warnings"`
+	TUN         TUNView       `json:"tun"`
+	Routes      RoutesView    `json:"routes"`
+	Tun2Socks   Tun2SocksView `json:"tun2socks"`
+	GeneratedAt string        `json:"generated_at"`
+}
+
+// StopRequest tears down orchestration and restores original routes.
+type StopRequest struct {
+	// Force skips graceful shutdown of tun2socks and proceeds with teardown.
+	Force bool `json:"force"`
+}
+
+// StopResponse provides a summary after teardown.
+type StopResponse struct {
+	State       string   `json:"state"`
+	Warnings    []string `json:"warnings"`
+	GeneratedAt string   `json:"generated_at"`
+}
